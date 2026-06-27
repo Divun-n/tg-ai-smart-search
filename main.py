@@ -5,8 +5,28 @@ import re
 import os
 from dotenv import load_dotenv
 from gigachat import GigaChat
+from datetime import datetime
 
 load_dotenv()
+
+def format_time(time_str):
+    try:
+        if '+' in time_str:
+            time_str = time_str.split('+')[0]
+        dt = datetime.fromisoformat(time_str)
+        return dt.strftime("%d.%m.%Y %H:%M")
+    except:
+        return time_str
+
+def extract_channel_name(url):
+    pattern = r'(?:https?://)?(?:www\.)?t\.me/([a-zA-Z0-9_]+)'
+    
+    match = re.search(pattern, url)
+    
+    if match:
+        return match.group(1)
+    else:
+        return None
 
 def parse_tg_history(channel_name, pages_depth = 3):
     HEADERS = {
@@ -31,14 +51,28 @@ def parse_tg_history(channel_name, pages_depth = 3):
             break
 
         print(f"   -> Найдено {len(messages)} постов на этой странице.")
-
+        count = 1
         for msg in messages:
             text_block = msg.find('div', class_='tgme_widget_message_text')
             text = text_block.get_text(separator='\n').strip() if text_block else "[Медиа или репост]"
             if text:
                 time_block = msg.find('time', class_='time')
                 post_time = time_block.get('datetime') if time_block else "Неизвестно"
-                all_collected_messages.append({"time": post_time, "text": text})
+
+                post_id = "0"
+                date_link = msg.find('a', class_='tgme_widget_message_date')
+                if date_link and 'href' in date_link.attrs:
+                    id_match = re.search(r'/(\d+)$', date_link['href'])
+                    if id_match:
+                        post_id = id_match.group(1)
+
+                all_collected_messages.append({
+                    "count": count, 
+                    "time": post_time, 
+                    "text": text,
+                    "id": post_id
+                })
+                count += 1
         
         first_msg = messages[0]
 
@@ -62,21 +96,20 @@ def parse_tg_history(channel_name, pages_depth = 3):
     return all_collected_messages
 
 
-def analyze_with_gigachat(posts):
+def analyze_with_gigachat(posts, topic):
     if not posts:
         print("На странице канала не найдено текстовых постов для анализа.")
 
     print(f"\nФормируем общую ленту из {len(posts)} постов для GigaChat...")
 
     full_texts_to_analyze = ""
-    for i, post in enumerate(posts, 1):
-        full_texts_to_analyze += f"--- ПОСТ №{i} (Дата: {post['time']}) ---\n{post['text']}\n\n"
+    for post in posts:
+        full_texts_to_analyze += f"--- ПОСТ №{post['count']} (Дата: {post['time']}) ---\n{post['text']}\n\n"
 
     promt = (
-        "Ты профессиональный медиа-аналитик. Перед тобой текст последних постов из Telegram-канала. "
-        "Сделай краткую, емкую и структурированную выжимку этих событий: "
-        "выдели главные темы, ключевые тезисы автора и важные инсайды. "
-        "Ответ напиши в красивом и понятном стиле, используя списки с буллитами."
+        f"""Ты профессиональный медиа-аналитик. Перед тобой текст последних постов из Telegram-канала.
+        Найди посты свзянны с темой "{topic}" и верни номера этих постов в одну строчку без лишних пробелов и оступов.
+        """
         )
     MY_DIRECT_KEY = os.getenv("GIGACHAT_CREDINTIALS")
 
@@ -97,11 +130,50 @@ def analyze_with_gigachat(posts):
             print("=" * 60)
             print(ai_text)
             print("=" * 60)
+            return ai_text
     except Exception as e:
         print(f"Ошибка GigaChat API: {e}")
 
 
 if __name__ == "__main__":
-    collected_post = parse_tg_history('dejavu041', pages_depth=1)
+    print("Умный AI тг поиск")
+    while True:
+        try:
+            tg_url = str(input("Вставьте ссылку на тг канал: "))
+            topic = str(input("Введите тему постов для поиска: "))
+            pages_depth = int(input("Введите глубину просмотра постов (20~ постов * n): "))
+            break
+        except Exception as e:
+            print(f"Произошла ошибка ({e}) попробуйте ещё раз.")
+            continue
+    channel_name = extract_channel_name(tg_url)
+    if not channel_name:
+        print("❌ Не удалось извлечь имя канала из ссылки!")
+        exit()
+    collected_post = parse_tg_history(channel_name, pages_depth = pages_depth)
 
-    analyze_with_gigachat(collected_post)
+    ai_response = analyze_with_gigachat(collected_post, topic)
+    if ai_response:
+        numbers = re.findall(r'\d+', ai_response)
+        if numbers:
+                print("\n📊 НАЙДЕННЫЕ ПОСТЫ ПО ТЕМЕ:")
+                for num_str in numbers:
+                    post_num = int(num_str)
+                    if 0 <= post_num - 1 < len(collected_post):
+                        post = collected_post[post_num - 1]
+                        
+                        post_link = f"https://t.me/{channel_name}/{post['id']}" if post['id'] != "0" else "Ссылка недоступна"
+                        print("-" * 60)
+                        print(f"пост №{post_num} | время: {format_time(post['time'])} | 🔗 Ссылка на пост: {post_link}")
+                        print("-" * 60)
+                        print(post['text'])
+                        print()
+                    else:
+                        print(f"⚠️ Пост №{post_num} не найден в собранных данных")
+        else:
+                print("ℹ️ GigaChat не нашёл постов по указанной теме.")
+    else:
+            print("❌ Не удалось получить ответ от GigaChat.")
+
+
+    
