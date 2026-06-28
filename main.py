@@ -4,7 +4,6 @@ import time
 import re
 import os
 from dotenv import load_dotenv
-from gigachat import GigaChat
 from datetime import datetime
 
 load_dotenv()
@@ -96,43 +95,66 @@ def parse_tg_history(channel_name, pages_depth = 3):
     return all_collected_messages
 
 
-def analyze_with_gigachat(posts, topic):
+def analyze_with_ai(posts, topic):
+    # Название функции оставил прежним, чтобы вам не пришлось менять вызовы в __main__
     if not posts:
         print("На странице канала не найдено текстовых постов для анализа.")
+        return None
 
-    print(f"\nФормируем общую ленту из {len(posts)} постов для GigaChat...")
+    print(f"\nФормируем общую ленту из {len(posts)} постов для ИИ...")
 
     full_texts_to_analyze = ""
     for post in posts:
         full_texts_to_analyze += f"--- ПОСТ №{post['count']} (Дата: {post['time']}) ---\n{post['text']}\n\n"
 
-    promt = (
-        f"""Ты профессиональный медиа-аналитик. Перед тобой текст последних постов из Telegram-канала.
-        Найди посты свзянны с темой "{topic}" и верни номера этих постов в одну строчку без лишних пробелов и оступов.
-        """
-        )
-    MY_DIRECT_KEY = os.getenv("GIGACHAT_CREDINTIALS")
+    prompt = (
+        f'Ты профессиональный медиа-аналитик. Перед тобой текст последних постов из Telegram-канала.\n'
+        f'Найди посты, связанные с темой "{topic}", и верни ТОЛЬКО НОМЕРА этих постов через запятую в одну строчку.\n'
+        f'Пример ответа: 3, 7, 12'
+    )
+    
+    API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-    if not MY_DIRECT_KEY:
-        print("Ошибка. Переменная GIGACHAT_CREDINTIALS не найдена в файле .env!")
-        return
-    clean_MY_DIRECT_KEY = MY_DIRECT_KEY.strip()
+    if not API_KEY:
+        print("Ошибка. Переменная OPENROUTER_API_KEY не найдена в файле .env!")
+        return None
+
+    # Настройки для запроса к OpenRouter
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {API_KEY.strip()}",
+        "Content-Type": "application/json", 
+        "HTTP-Referer": "https://github.com/", 
+        "X-Title": "TG AI Smart Search"
+    }
+    
+    data = {
+        "model": "openrouter/free",  # Автоматически выберет лучшую бесплатную модель (Llama 3, Qwen и др.)
+        "messages": [
+            {"role": "user", "content": f"{prompt}\n\nВот посты:\n{full_texts_to_analyze}"}
+        ]
+    }
+
     try:
-        with GigaChat(credentials = clean_MY_DIRECT_KEY, scope = "GIGACHAT_API_PERS", verify_ssl_certs=False) as giga:
-            user_message = f"{promt}\n\Вот посты:\n{full_texts_to_analyze}"
-
-            print("Отправляем запрос в GigaChat (ждём ответ)...")
-            response  = giga.chat(user_message)
-
-            ai_text = response.choices[0].message.content
-
-            print("\n ОТВЕТ GIGACHAT:")
+        print("🚀 Отправляем запрос в ИИ через OpenRouter (ждём ответ)...")
+        response = requests.post(url, headers=headers, json=data)
+        
+        if response.status_code == 200:
+            result = response.json()
+            ai_text = result['choices'][0]['message']['content']
+            
+            print("\n СЫРОЙ ОТВЕТ ИИ:")
             print("=" * 60)
             print(ai_text)
             print("=" * 60)
             return ai_text
+        else:
+            print(f"❌ Ошибка API: Код {response.status_code} | {response.text}")
+            return None
+            
     except Exception as e:
-        print(f"Ошибка GigaChat API: {e}")
+        print(f"Ошибка при отправке запроса: {e}")
+        return None
 
 
 if __name__ == "__main__":
@@ -152,7 +174,7 @@ if __name__ == "__main__":
         exit()
     collected_post = parse_tg_history(channel_name, pages_depth = pages_depth)
 
-    ai_response = analyze_with_gigachat(collected_post, topic)
+    ai_response = analyze_with_ai(collected_post, topic)
     if ai_response:
         numbers = re.findall(r'\d+', ai_response)
         if numbers:
