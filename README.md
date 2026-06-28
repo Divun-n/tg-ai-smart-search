@@ -21,13 +21,13 @@
 
     python -m venv .venv
 
-    # Активация для Windows:
+    Активация для Windows:
     .venv\Scripts\activate
 
-    # Активация для macOS/Linux:
+    Активация для macOS/Linux:
     source .venv/bin/activate
 
-    # Установка зависимостей:
+    Установка зависимостей:
     pip install requests beautifulsoup4 python-dotenv
 
     Получите бесплатный API-ключ:
