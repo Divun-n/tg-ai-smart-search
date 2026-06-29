@@ -29,9 +29,9 @@
    # Установка зависимостей:
    pip install requests beautifulsoup4 python-dotenv
 
-    Получите бесплатный API-ключ:
+3. Получите бесплатный API-ключ:
 
-3. Зарегистрируйтесь на сайте openrouter.ai.
+        Зарегистрируйтесь на сайте openrouter.ai.
 
         Перейдите в раздел Keys -> Create Key.
 
