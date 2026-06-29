@@ -13,7 +13,7 @@
 
 1. **Клонируйте репозиторий:**
    ```bash
-   git clone https://github.com/ВАШ_НИКНЕЙМ/tg-ai-smart-search.git
+   git clone https://github.com/Divun-n/tg-ai-smart-search.git
    cd tg-ai-smart-search
 
 2. Создайте виртуальное окружение и установите библиотеки:
@@ -22,10 +22,12 @@
     python -m venv .venv
 
     Активация для Windows:
-    .venv\Scripts\activate
+        .venv\Scripts\activate
+
 
     Активация для macOS/Linux:
-    source .venv/bin/activate
+        source .venv/bin/activate
+
 
     Установка зависимостей:
     pip install requests beautifulsoup4 python-dotenv
