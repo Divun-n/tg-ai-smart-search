@@ -47,6 +47,6 @@
         OPENROUTER_API_KEY=ваш_секретный_ключ_от_openrouter
 
 5. Запустите поисковик:
-    Bash
+    ```bash
 
     python main.py
