@@ -20,9 +20,10 @@
     Bash
 
     python -m venv .venv
-    
+   |-----------------------------|
    |Активация для Windows:       |
    |    .venv\Scripts\activate   |
+
    |-----------------------------|
    |Активация для macOS/Linux:   |
    |    source .venv/bin/activate|
